@@ -35,6 +35,10 @@ io.on('connection', (socket) => {
     });
   });
 
+  socket.on('request-offer', (data) => {
+    socket.to(data.target).emit('request-offer', data);
+  });
+
   socket.on('answer', (data) => {
     socket.to(data.target).emit('answer', {
       sdp: data.sdp,

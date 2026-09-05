@@ -1,7 +1,7 @@
 let audioContext: AudioContext | null = null;
 let nextPlayTime = 0;
 // We add a target latency buffer to absorb network jitter
-const TARGET_LATENCY_SECONDS = 0.3; 
+const TARGET_LATENCY_SECONDS = 0.8; 
 
 export function startPlayback() {
   if (!audioContext) {

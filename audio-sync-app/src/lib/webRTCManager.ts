@@ -26,6 +26,15 @@ export default class WebRTCManager {
     this.socket.on('user-joined', async ({ userId, role }) => {
       if (this.role === 'source' && role === 'receiver') {
         await this.createPeerConnection(userId, true);
+      } else if (this.role === 'receiver' && role === 'source') {
+        // If I am a receiver and a source just joined, ask them to connect to me!
+        this.socket.emit('request-offer', { target: userId, callerId: this.socket.id });
+      }
+    });
+
+    this.socket.on('request-offer', async (data) => {
+      if (this.role === 'source') {
+        await this.createPeerConnection(data.callerId, true);
       }
     });
 
