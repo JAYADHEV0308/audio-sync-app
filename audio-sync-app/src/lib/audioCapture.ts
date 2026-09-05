@@ -3,7 +3,11 @@ let stream: MediaStream | null = null;
 
 export async function startCapture(onDataAvailable: (data: ArrayBuffer) => void) {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    // getDisplayMedia allows capturing Tab/System audio (Screen Share)
+    stream = await navigator.mediaDevices.getDisplayMedia({ 
+      audio: true, 
+      video: true // Video must be true for screen share, but we will only send audio
+    });
     
     mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
     
