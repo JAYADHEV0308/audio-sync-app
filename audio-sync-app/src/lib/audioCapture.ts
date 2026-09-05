@@ -1,34 +1,50 @@
-let mediaRecorder: MediaRecorder | null = null;
 let stream: MediaStream | null = null;
+let audioContext: AudioContext | null = null;
+let processor: ScriptProcessorNode | null = null;
+let sourceNode: MediaStreamAudioSourceNode | null = null;
 
 export async function startCapture(onDataAvailable: (data: ArrayBuffer) => void) {
   try {
-    // getDisplayMedia allows capturing Tab/System audio (Screen Share)
+    // Capture system/tab audio
     stream = await navigator.mediaDevices.getDisplayMedia({ 
       audio: true, 
-      video: true // Video must be true for screen share, but we will only send audio
+      video: true 
     });
     
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+    // Use Web Audio API to extract raw PCM data
+    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     
-    mediaRecorder.ondataavailable = async (event) => {
-      if (event.data.size > 0) {
-        const arrayBuffer = await event.data.arrayBuffer();
-        onDataAvailable(arrayBuffer);
-      }
+    // We must ensure the sample rate matches the receiver. 
+    // Standardizing on the browser's default audioContext.sampleRate
+    
+    sourceNode = audioContext.createMediaStreamSource(stream);
+    
+    // 4096 frames per chunk (roughly 90ms at 44.1kHz)
+    processor = audioContext.createScriptProcessor(4096, 1, 1);
+    
+    processor.onaudioprocess = (event) => {
+      const inputBuffer = event.inputBuffer;
+      const channelData = inputBuffer.getChannelData(0); // Float32Array of raw PCM
+      
+      // Send the raw Float32Array buffer over WebRTC
+      // We slice it to ensure we send a clean copy
+      onDataAvailable(channelData.slice().buffer);
     };
     
-    // Capture small chunks every 100ms
-    mediaRecorder.start(100);
+    sourceNode.connect(processor);
+    processor.connect(audioContext.destination); // Required for processor to run in some browsers
+    
   } catch (err) {
-    console.error('Error accessing microphone:', err);
+    console.error('Error accessing audio stream:', err);
     throw err;
   }
 }
 
 export function stopCapture() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
+  if (processor && audioContext) {
+    processor.disconnect();
+    sourceNode?.disconnect();
+    audioContext.close();
   }
   if (stream) {
     stream.getTracks().forEach(track => track.stop());
