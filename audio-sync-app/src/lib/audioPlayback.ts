@@ -1,42 +1,51 @@
-let audioContext: AudioContext | null = null;
-let nextPlayTime = 0;
+let mediaSource: MediaSource | null = null;
+let sourceBuffer: SourceBuffer | null = null;
+let audioEl: HTMLAudioElement | null = null;
+let queue: ArrayBuffer[] = [];
+let isAppending = false;
 
 export function startPlayback() {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    nextPlayTime = audioContext.currentTime + 0.5; // add 500ms initial buffer delay
+  if (!audioEl) {
+    audioEl = new Audio();
+    audioEl.autoplay = true;
+    mediaSource = new MediaSource();
+    audioEl.src = URL.createObjectURL(mediaSource);
+
+    mediaSource.addEventListener('sourceopen', () => {
+      // The mimeType MUST match what the MediaRecorder is sending!
+      // 'audio/webm;codecs=opus' is what we set in audioCapture.ts
+      try {
+        sourceBuffer = mediaSource!.addSourceBuffer('audio/webm;codecs=opus');
+        
+        sourceBuffer.addEventListener('updateend', () => {
+          isAppending = false;
+          processQueue();
+        });
+      } catch (e) {
+        console.error('MSE Error: Browser might not support audio/webm', e);
+      }
+    });
   }
   
-  if (audioContext.state === 'suspended') {
-    audioContext.resume();
+  audioEl.play().catch(e => console.error('Audio play failed (needs interaction):', e));
+}
+
+function processQueue() {
+  if (sourceBuffer && !isAppending && queue.length > 0 && !sourceBuffer.updating) {
+    isAppending = true;
+    const chunk = queue.shift();
+    if (chunk) {
+      try {
+        sourceBuffer.appendBuffer(chunk);
+      } catch (e) {
+        console.error('Error appending buffer:', e);
+        isAppending = false;
+      }
+    }
   }
 }
 
-export async function enqueueChunk(chunk: ArrayBuffer) {
-  if (!audioContext) return;
-
-  try {
-    // Note: In a real implementation, we would use a more robust decoding strategy 
-    // or MediaSource Extensions. For MVP, we decode the ArrayBuffer.
-    // However, decodeAudioData expects a complete file structure, so chunking webm directly 
-    // might fail. A robust solution uses WebCodecs API or AudioWorklet.
-    // We will simulate playback scheduling for now.
-    
-    const audioBuffer = await audioContext.decodeAudioData(chunk.slice(0));
-    
-    const source = audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContext.destination);
-    
-    // Schedule playback
-    if (nextPlayTime < audioContext.currentTime) {
-      nextPlayTime = audioContext.currentTime + 0.1; // fallback if underrun
-    }
-    
-    source.start(nextPlayTime);
-    nextPlayTime += audioBuffer.duration;
-
-  } catch (e) {
-    console.error('Error decoding audio chunk. (Note: chunked webm decoding needs WebCodecs in prod)', e);
-  }
+export function enqueueChunk(chunk: ArrayBuffer) {
+  queue.push(chunk);
+  processQueue();
 }
