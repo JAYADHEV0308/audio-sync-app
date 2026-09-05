@@ -7,8 +7,12 @@ export default class WebRTCManager {
   private peerConnections: Map<string, RTCPeerConnection> = new Map();
   private dataChannels: Map<string, RTCDataChannel> = new Map();
   public onDataReceived?: (data: any) => void;
+  private roomId: string;
+  private role: 'source' | 'receiver';
 
-  constructor(private roomId: string, private role: 'source' | 'receiver') {
+  constructor(roomId: string, role: 'source' | 'receiver') {
+    this.roomId = roomId;
+    this.role = role;
     this.socket = io(SIGNALING_SERVER_URL);
     this.setupSocket();
   }
