@@ -1,0 +1,14 @@
+{
+  "name": "audio-sync-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "audio-sync-app",
+    "audio-sync-server"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace audio-sync-app",
+    "dev:backend": "npm start --workspace audio-sync-server",
+    "dev": "npm run dev:backend & npm run dev:frontend"
+  }
+}
